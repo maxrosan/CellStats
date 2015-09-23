@@ -1,8 +1,14 @@
 package com.guthub.com.maxrosan.cellstatis;
 
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -15,7 +21,11 @@ import android.telephony.CellInfoLte;
 import android.telephony.CellInfoWcdma;
 import android.telephony.NeighboringCellInfo;
 import android.telephony.TelephonyManager;
+import android.util.Log;
 import android.content.Context;
+import android.graphics.Color;
+import android.net.TrafficStats;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
@@ -29,6 +39,73 @@ import com.jjoe64.graphview.GraphView;
 import com.jjoe64.graphview.series.*;
 import com.jjoe64.graphview.LegendRenderer;
 
+class DownloadTask extends AsyncTask<String, Integer, String> {
+
+    private Context context;
+    //private PowerManager.WakeLock mWakeLock;
+
+    public DownloadTask(Context context) {
+        this.context = context;
+    }
+
+    @Override
+    protected String doInBackground(String... sUrl) {
+        InputStream input = null;
+        OutputStream output = null;
+        HttpURLConnection connection = null;
+        try {
+            URL url = new URL(sUrl[0]);
+            connection = (HttpURLConnection) url.openConnection();
+            connection.connect();
+
+            // expect HTTP 200 OK, so we don't mistakenly save error report
+            // instead of the file
+            if (connection.getResponseCode() != HttpURLConnection.HTTP_OK) {
+                return "Server returned HTTP " + connection.getResponseCode()
+                        + " " + connection.getResponseMessage();
+            }
+
+            // this will be useful to display download percentage
+            // might be -1: server did not report the length
+            int fileLength = connection.getContentLength();
+
+            // download the file
+            input = connection.getInputStream();
+            output = new FileOutputStream("/sdcard/downloadfile");
+
+            byte data[] = new byte[4096];
+            long total = 0;
+            int count;
+            while ((count = input.read(data)) != -1) {
+                // allow canceling with back button
+                if (isCancelled()) {
+                    input.close();
+                    return null;
+                }
+                total += count;
+                // publishing the progress....
+                if (fileLength > 0) // only if total length is known
+                    publishProgress((int) (total * 100 / fileLength));
+                output.write(data, 0, count);
+            }
+        } catch (Exception e) {
+            return e.toString();
+        } finally {
+            try {
+                if (output != null)
+                    output.close();
+                if (input != null)
+                    input.close();
+            } catch (IOException ignored) {
+            }
+
+            if (connection != null)
+                connection.disconnect();
+        }
+        return null;
+    }
+}
+
 public class MainActivity extends ActionBarActivity {
 
 	private ListView myListView;
@@ -41,7 +118,16 @@ public class MainActivity extends ActionBarActivity {
 	private Session session;
 	private GraphView graphView;
 	private LineGraphSeries<DataPoint> series = new LineGraphSeries<DataPoint>();
+	
+	private final int numberOfDbms = 3;
+	private ArrayList<LineGraphSeries<DataPoint>> seriesArray = new ArrayList<LineGraphSeries<DataPoint>>();
+	
+	private long rxBytes = 0;
+	private long txBytes = 0;
+	                                                                              
 	private int counter = 0;
+	
+	private DownloadTask downloadTask = new DownloadTask(this);
 
 	private class HandlerValues extends Handler {
 		@Override
@@ -103,6 +189,28 @@ public class MainActivity extends ActionBarActivity {
 			break;
 
 		}
+		
+		if (rxBytes == 0) {
+			
+			rxBytes = TrafficStats.getMobileRxBytes();
+			txBytes = TrafficStats.getMobileTxBytes();
+			
+		} else {
+			
+			if (TrafficStats.getMobileRxBytes() == TrafficStats.UNSUPPORTED) {
+				listAdapter.add("RX : unsupported");
+				listAdapter.add("TX : unsupported");
+			} else {
+				listAdapter.add("RX : " + (TrafficStats.getMobileRxBytes() - rxBytes) / 2000. + " kB/s");
+				listAdapter.add("TX : " + (TrafficStats.getMobileTxBytes() - txBytes) / 2000. + " kB/s");
+				rxBytes = TrafficStats.getMobileRxBytes();
+				txBytes = TrafficStats.getMobileTxBytes();
+			}
+			
+		}		
+
+		int i = 0;
+		ArrayList<Integer> dbms = new ArrayList<Integer>();
 
 		for (CellInfo cell : telephonyManager.getAllCellInfo()) {
 
@@ -113,7 +221,7 @@ public class MainActivity extends ActionBarActivity {
 			String level = "";
 			String id = "";
 			int dbmValue = 0;
-
+			
 			if (cell instanceof CellInfoLte) {
 				CellInfoLte cellLTE = (CellInfoLte) cell;
 
@@ -122,7 +230,7 @@ public class MainActivity extends ActionBarActivity {
 						+ cellLTE.getCellIdentity().getMnc();
 				signal = cellLTE.getCellSignalStrength().getDbm() + " dbm";
 				level = "level: " + cellLTE.getCellSignalStrength().getLevel();
-				id = "id: " + cellLTE.getCellIdentity().getTac();
+				id = "id: " + cellLTE.getCellIdentity().getPci();
 				dbmValue = cellLTE.getCellSignalStrength().getDbm();
 				
 			} else if (cell instanceof CellInfoWcdma) {
@@ -134,7 +242,7 @@ public class MainActivity extends ActionBarActivity {
 				signal = cellWCDMA.getCellSignalStrength().getDbm() + " dbm";
 				level = "level: "
 						+ cellWCDMA.getCellSignalStrength().getLevel();
-				id = "id: " + cellWCDMA.getCellIdentity().getLac();
+				id = "id: " + cellWCDMA.getCellIdentity().getCid();
 				dbmValue = cellWCDMA.getCellSignalStrength().getDbm();
 			} else if (cell instanceof CellInfoGsm) {
 				CellInfoGsm cellGSM = (CellInfoGsm) cell;
@@ -159,10 +267,22 @@ public class MainActivity extends ActionBarActivity {
 					+ "] [" + level + "] [" + registered + "] \n " + id);
 			
 			if (cell.isRegistered()) {
-				series.appendData(new DataPoint(counter++, dbmValue), true, 90);
+				series.setTitle("Cell " + id);
+				series.appendData(new DataPoint(counter, dbmValue), true, 90);
+			} else {
+				dbms.add(dbmValue);
 			}
 
 		}
+		
+		Collections.sort(dbms);
+		Collections.reverse(dbms);
+		
+		for (int j = 0; j < Math.min(dbms.size(), numberOfDbms); j++) {
+			seriesArray.get(j).appendData(new DataPoint(counter, dbms.get(j)), true, 90);
+		}
+		
+		counter++;
 		
 		listAdapter.notifyDataSetChanged();
 
@@ -188,11 +308,10 @@ public class MainActivity extends ActionBarActivity {
 		
 		myListView.setAdapter(listAdapter);
 
-		addValues();
-
-		timer.schedule(new UpdateValues(), 1500, 1500);
+		//addValues();
 
 		series.setTitle("Cell");
+		series.setColor(Color.RED);
 		
 		graphView = (GraphView) findViewById(R.id.graph);
 		graphView.getViewport().setMinY(-130);
@@ -202,6 +321,30 @@ public class MainActivity extends ActionBarActivity {
 		graphView.getLegendRenderer().setAlign(LegendRenderer.LegendAlign.TOP);		
 		
 		graphView.addSeries(series);
+		
+		for (int i = 0; i < numberOfDbms; i++) {
+			LineGraphSeries<DataPoint> instanceLineSeries = new LineGraphSeries<DataPoint>();
+			int color = 0;
+			
+			if (i == 0) {
+				color = Color.MAGENTA;
+			} else if (i == 1) {
+				color = Color.GREEN;
+			} else if (i == 2) {
+				color = Color.BLUE;
+			} else if (i == 3) {
+				color = Color.DKGRAY;
+			}
+			
+			instanceLineSeries.setColor(color);
+			instanceLineSeries.setTitle("Best cell " + (i+1));
+			
+			seriesArray.add(instanceLineSeries);
+			graphView.addSeries(instanceLineSeries);
+		}
+		
+		timer.schedule(new UpdateValues(), 0, 2000);
+		
 
 	}
 
@@ -211,6 +354,14 @@ public class MainActivity extends ActionBarActivity {
 		getMenuInflater().inflate(R.menu.main, menu);
 		return true;
 	}
+	
+	private void createDownloadTask() {
+		downloadTask.execute("http://releases.ubuntu.com/12.04/ubuntu-12.04.5-desktop-amd64.iso");
+	}
+	
+	private void cancelDownloadTask() {
+		downloadTask.cancel(true);
+	}
 
 	@Override
 	public boolean onOptionsItemSelected(MenuItem item) {
@@ -218,9 +369,17 @@ public class MainActivity extends ActionBarActivity {
 		// automatically handle clicks on the Home/Up button, so long
 		// as you specify a parent activity in AndroidManifest.xml.
 		int id = item.getItemId();
+		
 		if (id == R.id.action_settings) {
 			return true;
+		} else if (id == R.id.action_dl) {
+			createDownloadTask();
+			return true;
+		} else if (id == R.id.action_cancel_dl) {
+			cancelDownloadTask();
+			return true;
 		}
+		
 		return super.onOptionsItemSelected(item);
 	}
 }

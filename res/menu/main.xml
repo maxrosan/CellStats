@@ -9,4 +9,16 @@
         android:title="@string/action_settings"
         app:showAsAction="never"/>
 
+    <item
+        android:id="@+id/action_dl"
+        android:orderInCategory="100"
+        android:title="Download file"
+        app:showAsAction="never"/>
+    
+    <item
+        android:id="@+id/action_cancel_dl"
+        android:orderInCategory="100"
+        android:title="Cancel file"
+        app:showAsAction="never"/>    
+    
 </menu>
