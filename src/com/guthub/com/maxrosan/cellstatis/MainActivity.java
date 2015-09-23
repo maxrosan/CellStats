@@ -127,7 +127,7 @@ public class MainActivity extends ActionBarActivity {
 	                                                                              
 	private int counter = 0;
 	
-	private DownloadTask downloadTask = new DownloadTask(this);
+	private DownloadTask downloadTask = null;
 
 	private class HandlerValues extends Handler {
 		@Override
@@ -356,11 +356,15 @@ public class MainActivity extends ActionBarActivity {
 	}
 	
 	private void createDownloadTask() {
+		downloadTask = new DownloadTask(this);
 		downloadTask.execute("http://releases.ubuntu.com/12.04/ubuntu-12.04.5-desktop-amd64.iso");
 	}
 	
 	private void cancelDownloadTask() {
-		downloadTask.cancel(true);
+		if (downloadTask != null) {
+			downloadTask.cancel(true);
+			downloadTask = null;
+		}
 	}
 
 	@Override

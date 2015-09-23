@@ -12,13 +12,13 @@
     <item
         android:id="@+id/action_dl"
         android:orderInCategory="100"
-        android:title="Download file"
+        android:title="Download test file"
         app:showAsAction="never"/>
     
     <item
         android:id="@+id/action_cancel_dl"
         android:orderInCategory="100"
-        android:title="Cancel file"
+        android:title="Cancel download"
         app:showAsAction="never"/>    
     
 </menu>
