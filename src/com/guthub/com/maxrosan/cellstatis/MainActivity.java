@@ -13,6 +13,7 @@ import java.util.HashMap;
 import java.util.Timer;
 import java.util.TimerTask;
 
+import android.support.v4.app.NotificationCompat;
 import android.support.v7.app.ActionBarActivity;
 import android.telephony.CellIdentityLte;
 import android.telephony.CellInfo;
@@ -22,7 +23,12 @@ import android.telephony.CellInfoWcdma;
 import android.telephony.NeighboringCellInfo;
 import android.telephony.TelephonyManager;
 import android.util.Log;
+import android.app.Notification;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.app.TaskStackBuilder;
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.Color;
 import android.net.TrafficStats;
 import android.os.AsyncTask;
@@ -118,16 +124,18 @@ public class MainActivity extends ActionBarActivity {
 	private Session session;
 	private GraphView graphView;
 	private LineGraphSeries<DataPoint> series = new LineGraphSeries<DataPoint>();
+	private String txCell = "", rxCell = "";
 	
 	private final int numberOfDbms = 3;
 	private ArrayList<LineGraphSeries<DataPoint>> seriesArray = new ArrayList<LineGraphSeries<DataPoint>>();
 	
-	private long rxBytes = 0;
-	private long txBytes = 0;
+	protected long rxBytes = 0;
+	protected long txBytes = 0;
 	                                                                              
 	private int counter = 0;
 	
 	private DownloadTask downloadTask = null;
+	private int mId = 1;
 
 	private class HandlerValues extends Handler {
 		@Override
@@ -200,11 +208,21 @@ public class MainActivity extends ActionBarActivity {
 			if (TrafficStats.getMobileRxBytes() == TrafficStats.UNSUPPORTED) {
 				listAdapter.add("RX : unsupported");
 				listAdapter.add("TX : unsupported");
+				
+				rxCell = "unsupported";
+				txCell = "unsupported";
+				
+				
 			} else {
-				listAdapter.add("RX : " + (TrafficStats.getMobileRxBytes() - rxBytes) / 2000. + " kB/s");
-				listAdapter.add("TX : " + (TrafficStats.getMobileTxBytes() - txBytes) / 2000. + " kB/s");
+				
+				rxCell = (TrafficStats.getMobileRxBytes() - rxBytes) / 2000. + " kB/s";
+				txCell = (TrafficStats.getMobileTxBytes() - txBytes) / 2000. + " kB/s";
+				
+				listAdapter.add("RX : " + rxCell);
+				listAdapter.add("TX : " + txCell);
 				rxBytes = TrafficStats.getMobileRxBytes();
 				txBytes = TrafficStats.getMobileTxBytes();
+				
 			}
 			
 		}		
@@ -284,7 +302,9 @@ public class MainActivity extends ActionBarActivity {
 		
 		counter++;
 		
-		listAdapter.notifyDataSetChanged();
+		listAdapter.notifyDataSetChanged();	
+		
+		createNotification();
 
 	}
 
@@ -345,6 +365,7 @@ public class MainActivity extends ActionBarActivity {
 		
 		timer.schedule(new UpdateValues(), 0, 2000);
 		
+		createNotification();			
 
 	}
 
@@ -386,4 +407,29 @@ public class MainActivity extends ActionBarActivity {
 		
 		return super.onOptionsItemSelected(item);
 	}
+	
+	private void createNotification() {
+		
+		NotificationCompat.Builder builder =
+				new NotificationCompat.Builder(this)
+		.setContentTitle("CellStats")
+	    .setContentText("TX: " + txCell + "\nRX: " + rxCell)
+        .setAutoCancel(true)
+        .setWhen(System.currentTimeMillis())
+        .setSmallIcon(android.R.drawable.ic_dialog_alert)
+        .setVisibility(Notification.VISIBILITY_PUBLIC);	
+		
+		Intent resultIntent = new Intent(this, MainActivity.class);
+		
+		PendingIntent resultPendingIntent = 
+				PendingIntent.getActivity(this, 0, resultIntent, PendingIntent.FLAG_UPDATE_CURRENT);
+		
+		builder.setContentIntent(resultPendingIntent);
+		
+		((NotificationManager) getSystemService(NOTIFICATION_SERVICE)).notify(1, builder.build());
+		
+	}
+	
+	
+	
 }
