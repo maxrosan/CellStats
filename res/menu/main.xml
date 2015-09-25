@@ -4,12 +4,6 @@
     tools:context="com.guthub.com.maxrosan.cellstatis.MainActivity" >
 
     <item
-        android:id="@+id/action_settings"
-        android:orderInCategory="100"
-        android:title="@string/action_settings"
-        app:showAsAction="never"/>
-
-    <item
         android:id="@+id/action_dl"
         android:orderInCategory="100"
         android:title="Download test file"
@@ -19,6 +13,12 @@
         android:id="@+id/action_cancel_dl"
         android:orderInCategory="100"
         android:title="Cancel download"
+        app:showAsAction="never"/>
+    
+    <item
+        android:id="@+id/action_exit"
+        android:orderInCategory="100"
+        android:title="Exit"
         app:showAsAction="never"/>    
     
 </menu>

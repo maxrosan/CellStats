@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#ffffff">
+
+    <TextView
+        android:id="@+id/tdSignalStrengh"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignBaseline="@+id/tdCellId"
+        android:layout_alignBottom="@+id/tdCellId"
+        android:layout_alignParentRight="true"
+        android:layout_marginRight="27dp"
+        android:textColor="#000000"
+        android:text="signalStrengh" />
+
+    <TextView
+        android:id="@+id/tdTextTX"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_above="@+id/tdSignalStrengh"
+        android:layout_alignLeft="@+id/tdSignalStrengh"
+        android:text="TX: bytes"
+        android:textAppearance="?android:attr/textAppearanceSmall"
+        android:textColor="#000000" />
+
+    <TextView
+        android:id="@+id/tdTextRX"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentTop="true"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="15dp"
+        android:text="RX: bytes"
+        android:textAppearance="?android:attr/textAppearanceSmall"
+        android:textColor="#000000" />
+
+    <TextView
+        android:id="@+id/tdCellId"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignLeft="@+id/tdTextRX"
+        android:layout_below="@+id/tdTextRX"
+        android:text="Cell id: "
+        android:textColor="#000000" />
+
+    <TextView
+        android:id="@+id/tdRAT"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignBaseline="@+id/tdTextRX"
+        android:layout_alignBottom="@+id/tdTextRX"
+        android:layout_alignParentLeft="true"
+        android:layout_marginLeft="14dp"
+        android:text="Large Text"
+        android:textAppearance="?android:attr/textAppearanceLarge"
+        android:textColor="#000000" />
+
+    <TextView
+        android:id="@+id/tdLevel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignLeft="@+id/tdRAT"
+        android:layout_below="@+id/tdRAT"
+        android:textColor="#2fff2f"
+        android:text="TextView" />
+    
+</RelativeLayout>

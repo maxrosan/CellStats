@@ -1,11 +1,13 @@
 package com.guthub.com.maxrosan.cellstatis;
 
+import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -27,13 +29,17 @@ import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.TaskStackBuilder;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.ServiceConnection;
 import android.graphics.Color;
 import android.net.TrafficStats;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
+import android.os.IBinder;
 import android.os.Message;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -45,72 +51,6 @@ import com.jjoe64.graphview.GraphView;
 import com.jjoe64.graphview.series.*;
 import com.jjoe64.graphview.LegendRenderer;
 
-class DownloadTask extends AsyncTask<String, Integer, String> {
-
-    private Context context;
-    //private PowerManager.WakeLock mWakeLock;
-
-    public DownloadTask(Context context) {
-        this.context = context;
-    }
-
-    @Override
-    protected String doInBackground(String... sUrl) {
-        InputStream input = null;
-        OutputStream output = null;
-        HttpURLConnection connection = null;
-        try {
-            URL url = new URL(sUrl[0]);
-            connection = (HttpURLConnection) url.openConnection();
-            connection.connect();
-
-            // expect HTTP 200 OK, so we don't mistakenly save error report
-            // instead of the file
-            if (connection.getResponseCode() != HttpURLConnection.HTTP_OK) {
-                return "Server returned HTTP " + connection.getResponseCode()
-                        + " " + connection.getResponseMessage();
-            }
-
-            // this will be useful to display download percentage
-            // might be -1: server did not report the length
-            int fileLength = connection.getContentLength();
-
-            // download the file
-            input = connection.getInputStream();
-            output = new FileOutputStream("/sdcard/downloadfile");
-
-            byte data[] = new byte[4096];
-            long total = 0;
-            int count;
-            while ((count = input.read(data)) != -1) {
-                // allow canceling with back button
-                if (isCancelled()) {
-                    input.close();
-                    return null;
-                }
-                total += count;
-                // publishing the progress....
-                if (fileLength > 0) // only if total length is known
-                    publishProgress((int) (total * 100 / fileLength));
-                output.write(data, 0, count);
-            }
-        } catch (Exception e) {
-            return e.toString();
-        } finally {
-            try {
-                if (output != null)
-                    output.close();
-                if (input != null)
-                    input.close();
-            } catch (IOException ignored) {
-            }
-
-            if (connection != null)
-                connection.disconnect();
-        }
-        return null;
-    }
-}
 
 public class MainActivity extends ActionBarActivity {
 
@@ -136,6 +76,103 @@ public class MainActivity extends ActionBarActivity {
 	
 	private DownloadTask downloadTask = null;
 	private int mId = 1;
+	private String filePath = "";
+	private boolean mIsBound = false;
+	private ServiceRates mBoundService;
+	
+	private ServiceConnection mConnection = new ServiceConnection() {
+
+		@Override
+		public void onServiceConnected(ComponentName name, IBinder service) {
+			// TODO Auto-generated method stub
+			mBoundService = ((ServiceRates.LocalBinder)service).getService();
+		}
+
+		@Override
+		public void onServiceDisconnected(ComponentName name) {
+			// TODO Auto-generated method stub
+			mBoundService = null;
+		}
+
+	};
+	
+	class DownloadTask extends AsyncTask<String, Integer, String> {
+
+	    private Context context;
+	    //private PowerManager.WakeLock mWakeLock;
+
+	    public DownloadTask(Context context) {
+	        this.context = context;
+	    }
+
+	    @Override
+	    protected String doInBackground(String... sUrl) {
+	        InputStream input = null;
+	        OutputStream output = null;
+	        HttpURLConnection connection = null;
+	        String folderToStoreDownload = "";
+	        try {
+	            URL url = new URL(sUrl[0]);
+	            connection = (HttpURLConnection) url.openConnection();
+	            connection.connect();
+
+	            // expect HTTP 200 OK, so we don't mistakenly save error report
+	            // instead of the file
+	            if (connection.getResponseCode() != HttpURLConnection.HTTP_OK) {
+	                return "Server returned HTTP " + connection.getResponseCode()
+	                        + " " + connection.getResponseMessage();
+	            }
+
+	            // this will be useful to display download percentage
+	            // might be -1: server did not report the length
+	            int fileLength = connection.getContentLength();
+
+	            // download the file
+	            input = connection.getInputStream();
+	            
+	            if (Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED)) {
+	            	folderToStoreDownload = Environment.getExternalStorageDirectory().getAbsolutePath();
+	            } else {
+	            	folderToStoreDownload = Environment.getDataDirectory().getAbsolutePath();
+	            }
+	            
+	            filePath = folderToStoreDownload + "/downloadfile";
+	            	
+	            output = new FileOutputStream(filePath);
+
+	            byte data[] = new byte[4096];
+	            long total = 0;
+	            int count;
+	            while ((count = input.read(data)) != -1) {
+	                // allow canceling with back button
+	                if (isCancelled()) {
+	                    input.close();
+	                    return null;
+	                }
+	                total += count;
+	                // publishing the progress....
+	                if (fileLength > 0) // only if total length is known
+	                    publishProgress((int) (total * 100 / fileLength));
+	                output.write(data, 0, count);
+	            }
+	        } catch (Exception e) {
+	            return e.toString();
+	        } finally {
+	            try {
+	                if (output != null)
+	                    output.close();
+	                if (input != null)
+	                    input.close();
+	            } catch (IOException ignored) {
+	            }
+
+	            if (connection != null)
+	                connection.disconnect();
+	        }
+	        return null;
+	    }
+	}
+	
 
 	private class HandlerValues extends Handler {
 		@Override
@@ -155,6 +192,20 @@ public class MainActivity extends ActionBarActivity {
 		}
 
 	}
+	
+	private void doBindService() {
+	    bindService(new Intent(this, ServiceRates.class), mConnection, Context.BIND_AUTO_CREATE);
+	    mIsBound = true;
+	}
+
+	private void doUnbindService() {
+	    if (mIsBound) {
+	        // Detach our existing connection.
+	        unbindService(mConnection);
+	        mIsBound = false;
+	    }
+	}
+		
 
 	private void addValues() {
 
@@ -215,11 +266,24 @@ public class MainActivity extends ActionBarActivity {
 				
 			} else {
 				
-				rxCell = (TrafficStats.getMobileRxBytes() - rxBytes) / 2000. + " kB/s";
-				txCell = (TrafficStats.getMobileTxBytes() - txBytes) / 2000. + " kB/s";
+				double rateRx = (TrafficStats.getMobileRxBytes() - rxBytes) / 2000.;
+				double rateTx = (TrafficStats.getMobileTxBytes() - txBytes) / 2000.;
+				String unit = "k";
+				DecimalFormat myFormatter = new DecimalFormat("###.#");
 				
-				listAdapter.add("RX : " + rxCell);
-				listAdapter.add("TX : " + txCell);
+				if (rateRx > 1000.) {
+					unit = "M";
+					rateRx /= 1000.;
+					rateTx /= 1000.;
+				} else if (rateRx > 99.9) {
+					rateRx = Math.round(rateRx);
+					rateTx = Math.round(rateTx);
+				}
+				
+				rxCell = myFormatter.format(rateRx) + " " + unit + "B/s";
+				txCell = myFormatter.format(rateTx) + " " + unit + "B/s";
+				
+				listAdapter.add("RX : " + rxCell + " | TX : " + txCell);
 				rxBytes = TrafficStats.getMobileRxBytes();
 				txBytes = TrafficStats.getMobileTxBytes();
 				
@@ -236,7 +300,7 @@ public class MainActivity extends ActionBarActivity {
 			String type = "";
 			String signal = "";
 			String registered = "";
-			String level = "";
+			int level = 0;
 			String id = "";
 			int dbmValue = 0;
 			
@@ -247,7 +311,7 @@ public class MainActivity extends ActionBarActivity {
 				name = cellLTE.getCellIdentity().getMcc() + " "
 						+ cellLTE.getCellIdentity().getMnc();
 				signal = cellLTE.getCellSignalStrength().getDbm() + " dbm";
-				level = "level: " + cellLTE.getCellSignalStrength().getLevel();
+				level = cellLTE.getCellSignalStrength().getLevel();
 				id = "id: " + cellLTE.getCellIdentity().getPci();
 				dbmValue = cellLTE.getCellSignalStrength().getDbm();
 				
@@ -258,8 +322,7 @@ public class MainActivity extends ActionBarActivity {
 				name = cellWCDMA.getCellIdentity().getMcc() + " "
 						+ cellWCDMA.getCellIdentity().getMnc();
 				signal = cellWCDMA.getCellSignalStrength().getDbm() + " dbm";
-				level = "level: "
-						+ cellWCDMA.getCellSignalStrength().getLevel();
+				level = cellWCDMA.getCellSignalStrength().getLevel();
 				id = "id: " + cellWCDMA.getCellIdentity().getCid();
 				dbmValue = cellWCDMA.getCellSignalStrength().getDbm();
 			} else if (cell instanceof CellInfoGsm) {
@@ -269,7 +332,7 @@ public class MainActivity extends ActionBarActivity {
 				name = cellGSM.getCellIdentity().getMcc() + " "
 						+ cellGSM.getCellIdentity().getMnc();
 				signal = cellGSM.getCellSignalStrength().getDbm() + " dbm";
-				level = "level: " + cellGSM.getCellSignalStrength().getLevel();
+				level = cellGSM.getCellSignalStrength().getLevel();
 				id = "id: " + cellGSM.getCellIdentity().getCid();
 				dbmValue = cellGSM.getCellSignalStrength().getDbm();
 			}
@@ -281,12 +344,12 @@ public class MainActivity extends ActionBarActivity {
 				id = "id: unknown";
 			}
 
-			listAdapter.add("Cell [" + type + "] " + name + " \n [" + signal
-					+ "] [" + level + "] [" + registered + "] \n " + id);
+			listAdapter.add("Cell " + type + " " + name + "[" + id + "] [" + signal + "] \n " + calculateLevelString(level));
 			
 			if (cell.isRegistered()) {
 				series.setTitle("Cell " + id);
 				series.appendData(new DataPoint(counter, dbmValue), true, 90);
+				
 			} else {
 				dbms.add(dbmValue);
 			}
@@ -303,9 +366,24 @@ public class MainActivity extends ActionBarActivity {
 		counter++;
 		
 		listAdapter.notifyDataSetChanged();	
-		
-		createNotification();
 
+	}
+	
+	public static String calculateLevelString(int level) {
+		String levelString = "";
+		double levelDouble = level / 4.;
+		
+		for (int i = 0; i < (levelDouble * 20); i++) {
+			levelString += "|";
+		}
+		
+		return levelString;
+	}
+	
+	@Override
+	protected void onDestroy() {
+		super.onDestroy();
+		doUnbindService();
 	}
 
 	@Override
@@ -334,11 +412,9 @@ public class MainActivity extends ActionBarActivity {
 		series.setColor(Color.RED);
 		
 		graphView = (GraphView) findViewById(R.id.graph);
-		graphView.getViewport().setMinY(-130);
-		graphView.getViewport().setMaxY(30);
 		
 		graphView.getLegendRenderer().setVisible(true);
-		graphView.getLegendRenderer().setAlign(LegendRenderer.LegendAlign.TOP);		
+		graphView.getLegendRenderer().setAlign(LegendRenderer.LegendAlign.BOTTOM);		
 		
 		graphView.addSeries(series);
 		
@@ -365,7 +441,8 @@ public class MainActivity extends ActionBarActivity {
 		
 		timer.schedule(new UpdateValues(), 0, 2000);
 		
-		createNotification();			
+		doBindService();
+		
 
 	}
 
@@ -385,6 +462,9 @@ public class MainActivity extends ActionBarActivity {
 		if (downloadTask != null) {
 			downloadTask.cancel(true);
 			downloadTask = null;
+			
+			(new File(filePath)).delete();
+			
 		}
 	}
 
@@ -395,41 +475,24 @@ public class MainActivity extends ActionBarActivity {
 		// as you specify a parent activity in AndroidManifest.xml.
 		int id = item.getItemId();
 		
-		if (id == R.id.action_settings) {
-			return true;
-		} else if (id == R.id.action_dl) {
+		if (id == R.id.action_dl) {
 			createDownloadTask();
 			return true;
 		} else if (id == R.id.action_cancel_dl) {
 			cancelDownloadTask();
+			return true;
+		} else if (id == R.id.action_exit) {
+			mBoundService.cancelNotification();
+			mBoundService.stopSelf();			
+			finish();
+            System.exit(0);
 			return true;
 		}
 		
 		return super.onOptionsItemSelected(item);
 	}
 	
-	private void createNotification() {
-		
-		NotificationCompat.Builder builder =
-				new NotificationCompat.Builder(this)
-		.setContentTitle("CellStats")
-	    .setContentText("TX: " + txCell + "\nRX: " + rxCell)
-        .setAutoCancel(true)
-        .setWhen(System.currentTimeMillis())
-        .setSmallIcon(android.R.drawable.ic_dialog_alert)
-        .setVisibility(Notification.VISIBILITY_PUBLIC);	
-		
-		Intent resultIntent = new Intent(this, MainActivity.class);
-		
-		PendingIntent resultPendingIntent = 
-				PendingIntent.getActivity(this, 0, resultIntent, PendingIntent.FLAG_UPDATE_CURRENT);
-		
-		builder.setContentIntent(resultPendingIntent);
-		
-		((NotificationManager) getSystemService(NOTIFICATION_SERVICE)).notify(1, builder.build());
-		
-	}
-	
+
 	
 	
 }
