@@ -137,6 +137,8 @@ public class ServiceRates extends Service {
 		contentView.setTextViewText(R.id.tdTextTX, "TX: " + txCell);
 		contentView.setTextViewText(R.id.tdTextRX, "RX: " + rxCell);
 		
+		if (telephonyManager.getAllCellInfo() != null) {
+		
 		String type = "", name = "", signal = "", id = "";
 		int dbmValue = 0, level = 0;
 		
@@ -188,7 +190,16 @@ public class ServiceRates extends Service {
 				}
 				
 			}
-		}		
+		}
+		
+		} else {
+
+			contentView.setTextViewText(R.id.tdCellId, "---");
+			contentView.setTextViewText(R.id.tdRAT, "---");
+			contentView.setTextViewText(R.id.tdSignalStrengh, "-- dbm");
+			contentView.setTextViewText(R.id.tdLevel, "--");			
+			
+		}
 		
 		notification.contentView = contentView;
 		
@@ -199,7 +210,7 @@ public class ServiceRates extends Service {
         notification.flags |= Notification.FLAG_NO_CLEAR; //Do not clear the notification
         
         notification.flags |= Notification.FLAG_AUTO_CANCEL;
-        //notification.flags |= Notification.FLAG_FOREGROUND_SERVICE;
+        notification.flags |= Notification.FLAG_FOREGROUND_SERVICE;
         
         
 		
